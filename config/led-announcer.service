@@ -1,0 +1,17 @@
+[Unit]
+Description=LED Announcer HTTP Service
+After=network.target sound.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/loaled/Desktop/loaled/led_announcer
+Environment="PATH=/home/loaled/Desktop/loaled/led_announcer/.venv/bin:/usr/local/bin:/usr/bin"
+ExecStart=/home/loaled/Desktop/loaled/led_announcer/.venv/bin/uvicorn src.main:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+
+

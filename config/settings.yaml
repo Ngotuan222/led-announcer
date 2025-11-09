@@ -1,0 +1,28 @@
+led:
+  rows: 32
+  cols: 64
+  chain_length: 1  # Chỉ 1 module 32x64
+  parallel: 1      # Chỉ 1 panel
+  pwm_bits: 11
+  pwm_lsb_nanoseconds: 130
+  brightness: 100  # Tăng độ sáng để dễ thấy
+  gpio_slowdown: 4
+  hardware_mapping: regular
+  disable_hardware_pulse: true
+  font_path: /home/loaled/rpi-rgb-led-matrix/fonts/6x10.bdf  # Font nhỏ hơn cho màn hình 32x64
+  background_color: [0, 0, 0]
+  text_color: [255, 255, 255]
+  hold_seconds: 8.0
+
+audio:
+  language: vi
+  slow: false
+  playback_command: ["/usr/bin/mpg123", "-q"]
+  cache_dir: null
+
+service:
+  host: 0.0.0.0
+  port: 8000
+  reload: false
+
+
