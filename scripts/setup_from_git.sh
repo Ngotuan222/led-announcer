@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script cài đặt tự động LED Announcer từ Git
+# Script cài đặt tự động LED Announcer từ GitHub
 # Dành cho Raspberry Pi OS
 
 set -e  # Dừng script nếu có lỗi

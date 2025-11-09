@@ -2,7 +2,7 @@
 
 Dịch vụ Python dành cho Raspberry Pi 4 nhằm nhận yêu cầu qua HTTP (ví dụ Postman), hiển thị họ tên trên màn hình LED P4 256x128 (module 2121 A2) và phát giọng nói tiếng Việt bằng Google Text-to-Speech.
 
-## 📥 Cài đặt từ Git
+## 📥 Cài đặt từ GitHub
 
 ### Yêu cầu hệ thống
 - Raspberry Pi 4 (hoặc Pi 3/Zero 2 W)
@@ -15,8 +15,8 @@ Dịch vụ Python dành cho Raspberry Pi 4 nhằm nhận yêu cầu qua HTTP (v
 
 ```bash
 cd ~
-git clone <URL_REPOSITORY_GIT_CUA_BAN>
-cd led_announcer
+git clone https://github.com/TEN_USER/led-announcer.git
+cd led-announcer
 ```
 
 ### Bước 2: Chạy script cài đặt tự động
@@ -105,7 +105,7 @@ git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
 cd rpi-rgb-led-matrix
 make build-python
 sudo make install-python
-cd ~/led_announcer
+cd ~/led-announcer
 
 # Tạo và kích hoạt virtual environment
 python3 -m venv .venv
@@ -131,5 +131,12 @@ sudo systemctl enable --now led-announcer.service
 # Kiểm tra status
 sudo systemctl status led-announcer
 ```
+
+## 📖 Tài liệu tham khảo
+
+- `HUONG_DAN_SU_DUNG.md` - Hướng dẫn sử dụng chi tiết
+- `HUONG_DAN_TEST.md` - Hướng dẫn test màn hình
+- `KET_NOI_HARDWARE.md` - Hướng dẫn kết nối phần cứng
+- `KHUAC_PHUC_LED_KHONG_SANG.md` - Khắc phục LED không sáng
 
 
