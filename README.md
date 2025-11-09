@@ -2,87 +2,73 @@
 
 Dịch vụ Python dành cho Raspberry Pi 4 nhằm nhận yêu cầu qua HTTP (ví dụ Postman), hiển thị họ tên trên màn hình LED P4 256x128 (module 2121 A2) và phát giọng nói tiếng Việt bằng Google Text-to-Speech.
 
-## Chức năng chính
+## 📥 Cài đặt từ Git
 
-- API `POST /announce` nhận JSON gồm `id` và `fullname`.
-- Tên (`fullname`) được đưa lên LED matrix thông qua thư viện `rpi-rgb-led-matrix`.
-- Dùng Google TTS (`gTTS`) để phát âm thanh tiếng Việt (qua `mpg123`).
-- API `GET /healthz` để kiểm tra tình trạng dịch vụ.
+### Yêu cầu hệ thống
+- Raspberry Pi 4 (hoặc Pi 3/Zero 2 W)
+- Raspberry Pi OS (Bullseye hoặc mới hơn)
+- Kết nối internet
+- Màn hình LED P4 256x128 2121 A2 và mạch điều khiển
+- Loa (jack audio hoặc USB)
 
-## Yêu cầu phần cứng
-
-- Raspberry Pi 4.
-- Màn hình LED P4 256x128 2121 A2 và mạch điều khiển tương thích (ví dụ Adafruit RGB Matrix HAT).
-- Loa kết nối với jack audio hoặc qua USB.
-
-## Chuẩn bị hệ thống
+### Bước 1: Clone repository
 
 ```bash
-cd /home/loaled/Desktop/loaled/led_announcer
-chmod +x scripts/install_dependencies.sh
-./scripts/install_dependencies.sh
+cd ~
+git clone <URL_REPOSITORY_GIT_CUA_BAN>
+cd led_announcer
 ```
 
-Ghi chú:
-
-- Script trên cài `mpg123` để phát file MP3.
-- **Cài đặt rpi-rgb-led-matrix:**
-  ```bash
-  ./scripts/install_rgb_matrix.sh
-  ```
-  Script này sẽ tự động clone, build và cài đặt thư viện cùng Python bindings.
-  
-  Hoặc cài đặt thủ công:
-  ```bash
-  cd ~
-  git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
-  cd rpi-rgb-led-matrix
-  make build-python
-  sudo make install-python
-  ```
-- Font mặc định tham chiếu tới `/home/pi/rpi-rgb-led-matrix/fonts/10x20.bdf`. Điều chỉnh đường dẫn trong `config/settings.yaml` nếu cần.
-
-## Cấu hình
-
-Thay đổi thông số trong `config/settings.yaml`:
-
-- `led`: kích thước panel, độ sáng, tốc độ PWM, đường dẫn font.
-- `audio`: ngôn ngữ TTS (mặc định `vi`), lệnh phát (`mpg123 -q`).
-- `service`: địa chỉ và cổng chạy FastAPI.
-
-## Chạy dịch vụ
-
-### Cách 1: Sử dụng script (Khuyến nghị)
+### Bước 2: Chạy script cài đặt tự động
 
 ```bash
-./scripts/start_service.sh
+chmod +x scripts/setup_from_git.sh
+./scripts/setup_from_git.sh
 ```
 
 Script này sẽ tự động:
-- Kiểm tra và dừng process cũ nếu port đang được sử dụng
-- Kích hoạt virtual environment
-- Khởi động dịch vụ
+- Cài đặt Python dependencies
+- Cài đặt `mpg123` cho audio
+- Clone và cài đặt `rpi-rgb-led-matrix`
+- Tạo virtual environment
+- Cài đặt các thư viện Python cần thiết
 
-### Cách 2: Chạy thủ công
+### Bước 3: Kiểm tra phần cứng
 
 ```bash
+# Test kết nối LED
+python3 scripts/test_led_simple.py
+
+# Test hiển thị text
+python3 scripts/test_app.py
+```
+
+### Bước 4: Khởi động dịch vụ
+
+```bash
+# Chạy thủ công
 source .venv/bin/activate
 uvicorn src.main:app --host 0.0.0.0 --port 8000
+
+# Hoặc dùng script
+./scripts/start_service.sh
 ```
 
-### Dừng dịch vụ
+## 🚀 Sử dụng
 
-Nếu port bị chiếm, dừng process cũ:
+### Test API
+
 ```bash
-./scripts/stop_service.sh
+# Health check
+curl http://localhost:8000/healthz
+
+# Test announce
+curl -X POST http://localhost:8000/announce \
+  -H "Content-Type: application/json" \
+  -d '{"id":"001","fullname":"Nguyễn Văn A"}'
 ```
 
-Hoặc tìm và dừng thủ công:
-```bash
-lsof -ti :8000 | xargs kill
-```
-
-Truy cập từ thiết bị khác (ví dụ Postman):
+### Từ thiết bị khác
 
 ```http
 POST http://<IP_RASPBERRY_PI>:8000/announce
@@ -94,31 +80,56 @@ Content-Type: application/json
 }
 ```
 
-## Tạo service systemd (tuỳ chọn)
+## ⚙️ Cấu hình
 
-1. Sao chép file mẫu:
+Thay đổi thông số trong `config/settings.yaml`:
+
+- `led`: kích thước panel, độ sáng, tốc độ PWM, đường dẫn font
+- `audio`: ngôn ngữ TTS (mặc định `vi`), lệnh phát (`mpg123 -q`)
+- `service`: địa chỉ và cổng chạy FastAPI
+
+## 🛠️ Cài đặt thủ công (nếu script tự động thất bại)
+
+### Cài đặt dependencies
 
 ```bash
-sudo cp config/led-announcer.service /etc/systemd/system/
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Cài đặt các package cần thiết
+sudo apt install -y python3-pip python3-venv build-essential python3-dev git mpg123
+
+# Clone và cài đặt rpi-rgb-led-matrix
+cd ~
+git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
+cd rpi-rgb-led-matrix
+make build-python
+sudo make install-python
+cd ~/led_announcer
+
+# Tạo và kích hoạt virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Cài đặt Python dependencies
+pip install -r requirements.txt
 ```
 
-2. Điều chỉnh đường dẫn người dùng, virtualenv trong file nếu khác.
-
-3. Nạp và khởi động:
+## 🔧 Tạo service systemd (tuỳ chọn)
 
 ```bash
+# Sao chép file service
+sudo cp config/led-announcer.service /etc/systemd/system/
+
+# Điều chỉnh đường dẫn nếu cần (nếu clone đến thư mục khác)
+sudo nano /etc/systemd/system/led-announcer.service
+
+# Kích hoạt service
 sudo systemctl daemon-reload
 sudo systemctl enable --now led-announcer.service
+
+# Kiểm tra status
+sudo systemctl status led-announcer
 ```
-
-## Kiểm thử nhanh
-
-```bash
-curl -X POST http://localhost:8000/announce \
-  -H "Content-Type: application/json" \
-  -d '{"id":"42","fullname":"Trần Thị B"}'
-```
-
-Nếu phần LED chưa sẵn sàng, dịch vụ vẫn phát TTS và ghi log cảnh báo. Khi phần cứng hoạt động, gói tin tiếp theo sẽ hiển thị đầy đủ.
 
 
