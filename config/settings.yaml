@@ -17,7 +17,7 @@ led:
 audio:
   language: vi
   slow: false
-  playback_command: ["/usr/bin/mpg123", "-q"]
+  playback_command: ["/usr/bin/mpg123", "-a", "hw:0,0"]
   cache_dir: null
 
 service:

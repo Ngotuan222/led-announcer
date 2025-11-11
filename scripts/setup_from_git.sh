@@ -28,7 +28,7 @@ sudo apt upgrade -y
 
 # Cài đặt các package cần thiết
 echo "🔧 Installing required packages..."
-sudo apt install -y python3-pip python3-venv build-essential python3-dev git mpg123 curl cython3
+sudo apt install -y python3-pip python3-venv build-essential python3-dev git mpg123 curl cython3 cython3
 
 # Chạy setup script
 echo "🔧 Running setup script..."
