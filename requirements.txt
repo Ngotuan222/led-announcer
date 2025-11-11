@@ -2,5 +2,6 @@ fastapi==0.115.5
 uvicorn[standard]==0.32.0
 gTTS==2.5.4
 PyYAML==6.0.2
+cython>=0.29.0
 
 

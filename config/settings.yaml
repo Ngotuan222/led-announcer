@@ -9,7 +9,7 @@ led:
   gpio_slowdown: 4
   hardware_mapping: regular
   disable_hardware_pulse: true
-  font_path: /home/loaled/rpi-rgb-led-matrix/fonts/6x10.bdf  # Font nhỏ hơn cho màn hình 32x64
+  font_path: /home/admin/rpi-rgb-led-matrix/fonts/6x10.bdf  # Font nhỏ hơn cho màn hình 32x64
   background_color: [0, 0, 0]
   text_color: [255, 255, 255]
   hold_seconds: 8.0
