@@ -5,94 +5,109 @@
 
 set -e  # Dừng script nếu có lỗi
 
-echo "🚀 Bắt đầu cài đặt LED Announcer Service..."
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+MODE="${1:---auto}"
 
-# Kiểm tra quyền root
-if [[ $EUID -eq 0 ]]; then
-   echo "❌ Đừng chạy script này với quyền root (sudo)"
-   echo "👉 Chạy với user thường: ./scripts/setup_from_git.sh"
-   exit 1
-fi
+show_usage() {
+    cat <<'EOF'
+Usage: ./scripts/setup_from_git.sh [--auto|--manual|--help]
 
-# Kiểm tra kết nối internet
-echo "🌐 Kiểm tra kết nối internet..."
-if ! ping -c 1 google.com &> /dev/null; then
-    echo "❌ Không có kết nối internet. Vui lòng kiểm tra lại."
-    exit 1
-fi
+Options:
+  --auto    (mặc định) chạy toàn bộ quá trình cài đặt tự động
+  --manual  chỉ in ra hướng dẫn cài đặt thủ công để bạn chủ động thực hiện
+  --help    hiển thị trợ giúp
+EOF
+}
 
-# Update hệ thống
-echo "📦 Updating system packages..."
-sudo apt update
-sudo apt upgrade -y
+show_manual_steps() {
+    cat <<'EOF'
+📋 Các bước cài đặt thủ công:
+1. sudo apt update && sudo apt upgrade -y
+2. sudo apt install -y python3-pip python3-venv build-essential python3-dev git mpg123 curl cython3
+3. cd ~ && git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
+4. cd ~/rpi-rgb-led-matrix && make build-python && sudo make install-python
+5. cd ~/led-announcer && python3 -m venv .venv && source .venv/bin/activate
+6. pip install --upgrade pip && pip install -r requirements.txt
+7. chmod +x scripts/*.sh scripts/*.py
+8. python3 scripts/test_led_simple.py (kiểm tra LED) / ./scripts/start_service.sh (chạy dịch vụ)
 
-# Cài đặt các package cần thiết
-echo "🔧 Installing required packages..."
-sudo apt install -y python3-pip python3-venv build-essential python3-dev git mpg123 curl cython3 cython3
+Bạn có thể thực hiện từng bước để tùy chỉnh linh hoạt (ví dụ đổi thư mục, tùy chỉnh package).
+EOF
+}
 
-# Chạy setup script
-echo "🔧 Running setup script..."
-chmod +x scripts/setup_from_git.sh
-./scripts/setup_from_git.sh
+require_non_root() {
+    if [[ $EUID -eq 0 ]]; then
+        echo "❌ Đừng chạy script này với quyền root (sudo)"
+        echo "👉 Chạy với user thường: ./scripts/setup_from_git.sh"
+        exit 1
+    fi
+}
 
-# Kiểm tra và cài đặt rpi-rgb-led-matrix
-echo "🔌 Installing rpi-rgb-led-matrix library..."
-if [ ! -d "$HOME/rpi-rgb-led-matrix" ]; then
-    echo "Cloning rpi-rgb-led-matrix..."
-    cd ~
-    git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
-    cd rpi-rgb-led-matrix
-else
-    echo "rpi-rgb-led-matrix already exists, updating..."
-    cd ~/rpi-rgb-led-matrix
-    git pull
-fi
+check_internet() {
+    echo "🌐 Kiểm tra kết nối internet..."
+    if ! ping -c 1 google.com &> /dev/null; then
+        echo "❌ Không có kết nối internet. Vui lòng kiểm tra lại."
+        exit 1
+    fi
+}
 
-# Build và cài đặt
-echo "Building and installing rpi-rgb-led-matrix..."
-make build-python
-sudo make install-python
+setup_system_packages() {
+    echo "📦 Updating system packages..."
+    sudo apt update
+    sudo apt upgrade -y
 
-# Quay lại thư mục dự án
-cd ~/led_announcer
+    echo "🔧 Installing required packages..."
+    sudo apt install -y python3-pip python3-venv build-essential python3-dev git mpg123 curl cython3
+}
 
-# Tạo virtual environment
-echo "🐍 Creating Python virtual environment..."
-if [ ! -d ".venv" ]; then
-    python3 -m venv .venv
-fi
+install_rgb_led_matrix() {
+    echo "🔌 Installing rpi-rgb-led-matrix library..."
+    if [ ! -d "$HOME/rpi-rgb-led-matrix" ]; then
+        echo "Cloning rpi-rgb-led-matrix..."
+        git clone https://github.com/hzeller/rpi-rgb-led-matrix.git "$HOME/rpi-rgb-led-matrix"
+    else
+        echo "rpi-rgb-led-matrix already exists, updating..."
+        (cd "$HOME/rpi-rgb-led-matrix" && git pull)
+    fi
 
-# Kích hoạt virtual environment và cài đặt dependencies
-echo "📚 Installing Python dependencies..."
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
+    echo "Building and installing rpi-rgb-led-matrix..."
+    (cd "$HOME/rpi-rgb-led-matrix" && make build-python && sudo make install-python)
+}
 
-# Kiểm tra font
-echo "🔤 Checking font availability..."
-FONT_PATH="/home/pi/rpi-rgb-led-matrix/fonts/10x20.bdf"
-if [ ! -f "$FONT_PATH" ]; then
-    echo "⚠️  Font not found at $FONT_PATH"
-    echo "🔍 Creating fonts directory and downloading basic font..."
-    sudo mkdir -p /home/pi/rpi-rgb-led-matrix/fonts/
-    
-    # Tạo font đơn giản nếu không có
-    if [ ! -f "/home/pi/rpi-rgb-led-matrix/fonts/10x20.bdf" ]; then
+setup_python_env() {
+    cd "$PROJECT_ROOT"
+    echo "🐍 Creating Python virtual environment..."
+    if [ ! -d ".venv" ]; then
+        python3 -m venv .venv
+    fi
+
+    echo "📚 Installing Python dependencies..."
+    source .venv/bin/activate
+    pip install --upgrade pip
+    pip install -r requirements.txt
+}
+
+check_font() {
+    echo "🔤 Checking font availability..."
+    FONT_PATH="$HOME/rpi-rgb-led-matrix/fonts/10x20.bdf"
+    if [ ! -f "$FONT_PATH" ]; then
+        echo "⚠️  Font not found at $FONT_PATH"
+        echo "🔍 Creating fonts directory"
+        sudo mkdir -p "$HOME/rpi-rgb-led-matrix/fonts/"
         echo "Font sẽ được tạo tự động khi chạy test lần đầu"
     fi
-fi
+}
 
-# Cấu hình permissions
-echo "🔐 Setting up permissions..."
-chmod +x scripts/*.sh
-chmod +x scripts/*.py
+run_tests() {
+    cd "$PROJECT_ROOT"
+    echo "🔐 Setting up permissions..."
+    chmod +x scripts/*.sh
+    chmod +x scripts/*.py
 
-# Test cài đặt
-echo "🧪 Testing installation..."
-source .venv/bin/activate
+    echo "🧪 Testing installation..."
+    source .venv/bin/activate
 
-# Test import các thư viện
-python3 -c "
+    python3 -c "
 import sys
 try:
     import fastapi
@@ -105,8 +120,7 @@ except ImportError as e:
     sys.exit(1)
 "
 
-# Test rpi-rgb-led-matrix
-python3 -c "
+    python3 -c "
 import sys
 try:
     from rgbmatrix import RGBMatrix, RGBMatrixOptions
@@ -116,29 +130,61 @@ except ImportError as e:
     print('🔧 You may need to run with sudo for LED access')
     sys.exit(1)
 "
+}
 
-echo ""
-echo "🎉 Cài đặt hoàn tất!"
-echo ""
-echo "📋 Các bước tiếp theo:"
-echo "1. Kiểm tra phần cứng:"
-echo "   python3 scripts/test_led_simple.py"
-echo ""
-echo "2. Test hiển thị text:"
-echo "   python3 scripts/test_app.py"
-echo ""
-echo "3. Khởi động dịch vụ:"
-echo "   ./scripts/start_service.sh"
-echo ""
-echo "4. Hoặc chạy thủ công:"
-echo "   source .venv/bin/activate"
-echo "   uvicorn src.main:app --host 0.0.0.0 --port 8000"
-echo ""
-echo "📖 Xem README.md để biết thêm chi tiết"
-echo "🌐 API sẽ chạy tại: http://localhost:8000"
-echo "📚 API docs: http://localhost:8000/docs"
-echo ""
-echo "⚠️  Lưu ý:"
-echo "- Nếu LED không sáng, chạy với sudo: sudo python3 scripts/test_led_simple.py"
-echo "- Kiểm tra kết nối phần cứng trong tài liệu KET_NOI_HARDWARE.md"
-echo "- Điều chỉnh cấu hình trong config/settings.yaml nếu cần"
+print_next_steps() {
+    echo ""
+    echo "🎉 Cài đặt hoàn tất!"
+    echo ""
+    echo "📋 Các bước tiếp theo:"
+    echo "1. Kiểm tra phần cứng:"
+    echo "   python3 scripts/test_led_simple.py"
+    echo ""
+    echo "2. Test hiển thị text:"
+    echo "   python3 scripts/test_app.py"
+    echo ""
+    echo "3. Khởi động dịch vụ:"
+    echo "   ./scripts/start_service.sh"
+    echo ""
+    echo "4. Hoặc chạy thủ công:"
+    echo "   source .venv/bin/activate"
+    echo "   uvicorn src.main:app --host 0.0.0.0 --port 8000"
+    echo ""
+    echo "📖 Xem README.md để biết thêm chi tiết"
+    echo "🌐 API sẽ chạy tại: http://localhost:8000"
+    echo "📚 API docs: http://localhost:8000/docs"
+    echo ""
+    echo "⚠️  Lưu ý:"
+    echo "- Nếu LED không sáng, chạy với sudo: sudo python3 scripts/test_led_simple.py"
+    echo "- Kiểm tra kết nối phần cứng trong tài liệu KET_NOI_HARDWARE.md"
+    echo "- Điều chỉnh cấu hình trong config/settings.yaml nếu cần"
+}
+
+run_auto_mode() {
+    echo "🚀 Bắt đầu cài đặt LED Announcer Service..."
+    require_non_root
+    check_internet
+    setup_system_packages
+    install_rgb_led_matrix
+    setup_python_env
+    check_font
+    run_tests
+    print_next_steps
+}
+
+case "$MODE" in
+    --auto)
+        run_auto_mode
+        ;;
+    --manual)
+        show_manual_steps
+        ;;
+    --help|-h)
+        show_usage
+        ;;
+    *)
+        echo "❌ Tùy chọn không hợp lệ: $MODE"
+        show_usage
+        exit 1
+        ;;
+esac

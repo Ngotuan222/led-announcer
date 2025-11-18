@@ -23,15 +23,20 @@ cd led-announcer
 
 ```bash
 chmod +x scripts/setup_from_git.sh
-./scripts/setup_from_git.sh
+# Chế độ tự động (mặc định)
+./scripts/setup_from_git.sh --auto
+
+# Hoặc chỉ in hướng dẫn để tự thực hiện từng bước
+./scripts/setup_from_git.sh --manual
 ```
 
-Script này sẽ tự động:
-- Cài đặt Python dependencies
-- Cài đặt `mpg123` cho audio
-- Clone và cài đặt `rpi-rgb-led-matrix`
+Chế độ tự động sẽ đảm nhiệm:
+- Cập nhật hệ thống và cài đặt package cần thiết (`python3-*`, `mpg123`, ...)
+- Clone/ cập nhật và build `rpi-rgb-led-matrix`
 - Tạo virtual environment
-- Cài đặt các thư viện Python cần thiết
+- Cài đặt các thư viện Python cần thiết và kiểm tra phụ thuộc
+
+Chế độ `--manual` chỉ in ra danh sách bước thao tác tay để bạn tùy biến (ví dụ đổi thư mục, bỏ bớt bước), không thực thi bất cứ lệnh cài đặt nào.
 
 ### Bước 3: Kiểm tra phần cứng
 
@@ -93,26 +98,32 @@ Thay đổi thông số trong `config/settings.yaml`:
 ### Cài đặt dependencies
 
 ```bash
-# Update system
+# 1. Update hệ thống
 sudo apt update && sudo apt upgrade -y
 
-# Cài đặt các package cần thiết
-sudo apt install -y python3-pip python3-venv build-essential python3-dev git mpg123
+# 2. Cài đặt các package cần thiết
+sudo apt install -y python3-pip python3-venv build-essential python3-dev git mpg123 curl cython3
 
-# Clone và cài đặt rpi-rgb-led-matrix
+# 3. Clone & cài đặt rpi-rgb-led-matrix
 cd ~
 git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
 cd rpi-rgb-led-matrix
 make build-python
 sudo make install-python
+
+# 4. Quay lại thư mục dự án
 cd ~/led-announcer
 
-# Tạo và kích hoạt virtual environment
+# 5. Tạo & kích hoạt virtualenv
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Cài đặt Python dependencies
+# 6. Cài dependencies Python
+pip install --upgrade pip
 pip install -r requirements.txt
+
+# 7. Cấp quyền chạy script (tuỳ chọn)
+chmod +x scripts/*.sh scripts/*.py
 ```
 
 ## 🔧 Tạo service systemd (tuỳ chọn)
