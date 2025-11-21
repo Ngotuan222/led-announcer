@@ -12,12 +12,11 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 venv_python = project_root / ".venv" / "bin" / "python3"
 
-# Kiểm tra nếu đang chạy với Python hệ thống nhưng venv Python có sẵn
+# Nếu có venv nhưng hiện đang dùng Python hệ thống, chỉ cảnh báo (không thoát)
 if not sys.executable.startswith(str(project_root)) and venv_python.exists():
     print("⚠️  Đang sử dụng Python hệ thống thay vì Python từ venv")
-    print(f"   → Chạy lại với: sudo {venv_python} {sys.argv[0]}")
-    print(f"   → Hoặc: {venv_python} {sys.argv[0]}")
-    sys.exit(1)
+    print(f"   → Có thể chạy với: {venv_python} {sys.argv[0]}")
+
 
 sys.path.insert(0, str(project_root))
 

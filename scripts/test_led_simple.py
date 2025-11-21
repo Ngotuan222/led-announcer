@@ -59,6 +59,7 @@ options.drop_privileges = False
 # Tắt hardware pulse nếu không có root
 if led_config.get("disable_hardware_pulse", True):
     options.disable_hardware_pulsing = True
+    options.scan_mode = led_config.get("scan_mode", 0)
 
 print(f"\nCấu hình LED Matrix:")
 print(f"  - Kích thước: {options.rows}x{options.cols}")

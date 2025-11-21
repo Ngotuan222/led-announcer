@@ -5,14 +5,16 @@ led:
   parallel: 1      # Chỉ 1 panel
   pwm_bits: 11
   pwm_lsb_nanoseconds: 130
-  brightness: 100  # Tăng độ sáng để dễ thấy
-  gpio_slowdown: 4
+  brightness: 80 # Tăng độ sáng tối đa để dễ thấy
+  gpio_slowdown: 5
   hardware_mapping: regular
   disable_hardware_pulse: true
-  font_path: /home/admin/rpi-rgb-led-matrix/fonts/6x10.bdf  # Font nhỏ hơn cho màn hình 32x64
+  font_path: /home/loaled/rpi-rgb-led-matrix/fonts/7x13.bdf  # Font lớn hơn một chút cho màn hình 32x64
   background_color: [0, 0, 0]
   text_color: [255, 255, 255]
   hold_seconds: 8.0
+  scan_mode: 0
+  multiplexing: 1 # <- THÊM DÒNG NÀY
 
 audio:
   language: vi

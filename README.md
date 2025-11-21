@@ -143,6 +143,47 @@ sudo systemctl enable --now led-announcer.service
 sudo systemctl status led-announcer
 ```
 
+### 🔄 Khởi động lại (reset) service
+
+- **Nếu dùng systemd** (đã tạo `led-announcer.service`):
+
+  ```bash
+  # Khởi động lại sau khi sửa code hoặc config
+  sudo systemctl restart led-announcer
+
+  # Xem log realtime để debug khi có lỗi
+  sudo journalctl -u led-announcer -f
+  ```
+
+- **Nếu chạy thủ công bằng uvicorn** (không dùng systemd):
+
+  ```bash
+  # 1. Dừng tiến trình hiện tại (Ctrl + C trong terminal đang chạy uvicorn)
+
+  # 2. Kích hoạt lại virtualenv (nếu cần)
+  cd ~/led-announcer
+  source .venv/bin/activate
+
+  # 3. Chạy lại service
+  uvicorn src.main:app --host 0.0.0.0 --port 8000
+  ```
+
+### ⏹️ Dừng hẳn service
+
+- **Nếu dùng systemd**:
+
+  ```bash
+  # Dừng service và không chạy lại cho đến khi bạn start thủ công
+  sudo systemctl stop led-announcer
+  ```
+
+- **Nếu chạy thủ công bằng uvicorn**:
+
+  ```bash
+  # Dừng service đang chạy trong terminal hiện tại
+  Ctrl + C
+  ```
+
 ## 📖 Tài liệu tham khảo
 
 - `HUONG_DAN_SU_DUNG.md` - Hướng dẫn sử dụng chi tiết
@@ -150,4 +191,82 @@ sudo systemctl status led-announcer
 - `KET_NOI_HARDWARE.md` - Hướng dẫn kết nối phần cứng
 - `KHUAC_PHUC_LED_KHONG_SANG.md` - Khắc phục LED không sáng
 
+## 🧾 Ghi chú cách cập nhật code lên GitHub (nhánh `master`)
 
+Repository GitHub:
+
+```bash
+https://github.com/Ngotuan222/led-announcer.git
+```
+
+### 1. Kiểm tra trạng thái hiện tại
+
+```bash
+git status
+git remote -v
+```
+
+- Đảm bảo đang ở đúng thư mục dự án:
+
+```bash
+cd ~/led-announcer
+```
+
+- Đảm bảo đang ở nhánh `master`:
+
+```bash
+git branch
+# Nếu chưa ở master thì chuyển sang:
+git checkout master
+```
+
+### 2. Thêm file và tạo commit mới
+
+```bash
+# Thêm tất cả thay đổi (hoặc thay bằng tên file cụ thể nếu muốn chọn lọc)
+git add .
+# Tạo commit với nội dung mô tả rõ ràng
+git commit -m "Mo ta ngan gon ve thay doi"  # VD: "Cap nhat config panel 64x32"
+```
+
+Nếu Git báo "nothing to commit" nghĩa là chưa có thay đổi mới so với commit gần nhất.
+
+### 3. Đẩy code lên GitHub (nhánh `master`)
+
+```bash
+git push origin master
+```
+
+Sau khi chạy lệnh trên, vào trang:
+
+```bash
+https://github.com/Ngotuan222/led-announcer
+```
+
+để kiểm tra lại code đã được cập nhật.
+
+## 📝 Ghi chú cấu hình panel 64x32 ICN2012
+
+- **Phần cứng**
+  - Panel P5 64x32, driver ICN2012.
+  - Cấu hình cơ bản trong `config/settings.yaml`:
+    - `rows: 32`, `cols: 64`, `chain_length: 1`, `parallel: 1`.
+- **Multiplexing**
+  - Panel hiển thị lặp 3 lần theo chiều dọc nếu dùng cấu hình mặc định.
+  - Đã khắc phục bằng cách thêm trường `multiplexing`:
+    - Trong `config/settings.yaml`:
+      - `multiplexing: 1`.
+    - Trong `src/config.py` (`LedDisplayConfig`):
+      - Thêm thuộc tính `multiplexing: int = 0`.
+    - Trong `src/display.py` (`LedDisplay._build_options`):
+      - `options.multiplexing = self.config.multiplexing`.
+- **Font & căn giữa text**
+  - Đường dẫn font hiện tại trong `settings.yaml`:
+    - `font_path: /home/loaled/rpi-rgb-led-matrix/fonts/7x13.bdf`.
+  - Các hàm hiển thị text sử dụng cấu hình từ `LedDisplayConfig`:
+    - `LedDisplay.show_text()` – text tĩnh căn giữa theo chiều ngang, baseline được dời lên một chút để không chạm mép dướ
+    - `LedDisplay.show_scrolling_text()` – hiển thị 2 dòng (tên cũ + tên mới), đối xứng quanh tâm màn hình, mỗi dòng có baseline được dịch lên để phù hợp panel 64x32.
+- **Script test riêng cho panel 64x32**
+  - `testled/testled.py` (ngoài project `led-announcer`):
+    - Cấu hình cố định 64x32, `multiplexing = 1`.
+    - Vẽ một điểm tâm màn hình và chữ "test" căn giữa để kiểm tra nhanh mapping phần cứng.

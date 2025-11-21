@@ -70,6 +70,9 @@ class LedDisplay:
         # Tắt hardware pulse nếu không có root (tránh lỗi permission)
         if self.config.disable_hardware_pulse:
             options.disable_hardware_pulsing = True
+            options.scan_mode = self.config.scan_mode
+        # Áp dụng cấu hình multiplexing nếu có
+        options.multiplexing = self.config.multiplexing
         return options
 
     @staticmethod
@@ -120,7 +123,8 @@ class LedDisplay:
             # Với màn hình 32x64 và font 6x10:
             # total_rows = 32, font_height = 10
             # baseline = 16 + 5 = 21 (text sẽ nằm từ y=11 đến y=21, giữa là y=16)
-            baseline = total_rows // 2 + font_height // 2
+            # Dời toàn bộ text lên trên 3 pixel
+            baseline = total_rows // 2 + font_height // 2 - 2
             
             # Tính chiều dài text để căn giữa (dựa trên tổng chiều ngang)
             # Sử dụng canvas tạm để đo chiều dài text
@@ -187,14 +191,23 @@ class LedDisplay:
             total_rows = self.config.rows * self.config.parallel
             total_cols = self.config.cols * self.config.chain_length
             
-            # Tính vị trí cho 2 dòng
+            # Tính vị trí cho 2 dòng, đối xứng quanh tâm màn hình
             font_height = self._font.height
-            
-            # Dòng trên (text cũ): ở vị trí 1/3 từ trên xuống - dịch lên trên 3 pixel (2+1)
-            top_baseline = total_rows // 3 + font_height // 2 - 3
-            
-            # Dòng dưới (text mới): ở vị trí 2/3 từ trên xuống - dịch lên trên 1 pixel
-            bottom_baseline = (total_rows * 2) // 3 + font_height // 2 - 1
+
+            # Tâm màn hình theo chiều dọc
+            center_row = total_rows // 2
+            # Giữ khoảng cách tối thiểu giữa 2 dòng để chữ không chồng lên nhau
+            line_spacing = max(2, font_height // 4)
+
+            # Khoảng cách giữa tâm 2 dòng
+            line_center_offset = (font_height + line_spacing) // 2
+
+            # Chuyển từ tâm sang baseline (baseline = center + font_height/2)
+            top_center = center_row - line_center_offset
+            bottom_center = center_row + line_center_offset
+            # Dời cả hai baseline lên trên 3 pixel
+            top_baseline = max(font_height, top_center + font_height // 2 - 2)
+            bottom_baseline = min(total_rows - 1, bottom_center + font_height // 2 - 3)
             
             # Tính chiều dài text mới và text cũ
             temp_canvas = self._matrix.CreateFrameCanvas()

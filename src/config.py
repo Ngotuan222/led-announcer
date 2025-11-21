@@ -27,6 +27,8 @@ class LedDisplayConfig:
     background_color: List[int] = field(default_factory=lambda: [0, 0, 0])
     text_color: List[int] = field(default_factory=lambda: [255, 255, 255])
     hold_seconds: float = 8.0
+    scan_mode: int = 0
+    multiplexing: int = 0
 
 
 @dataclass
