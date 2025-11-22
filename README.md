@@ -93,6 +93,27 @@ Thay đổi thông số trong `config/settings.yaml`:
 - `audio`: ngôn ngữ TTS (mặc định `vi`), lệnh phát (`mpg123 -q`)
 - `service`: địa chỉ và cổng chạy FastAPI
 
+### 📢 Tăng max volume trên Raspberry Pi 4B
+
+Mặc định loa trên Raspberry Pi 4B có thể không đủ lớn để nghe rõ trong môi trường ồn. Dưới đây là hướng dẫn tăng max volume bằng các lệnh amixer/alsamixer.
+
+```bash
+# 1) Tăng volume lên 100% cho card/thiết bị audio mặc định
+amixer set Master 100%
+
+# 2) Mở giao diện âm thanh để điều chỉnh
+alsamixer
+
+#  - Dùng phím mũi tên lên/xuống để tăng/giảm volume.
+#  - Nhấn M để bật/tắt (khi phần trăm volume hiện là 0).
+#  - Nhấn Esc để đóng cửa sổ.
+
+# 3) Lưu lại cấu hình volume hiện tại
+sudo alsactl store
+```
+
+Sau khi tăng volume, bạn cần khởi động lại dịch vụ để áp dụng thay đổi.
+
 ## 🛠️ Cài đặt thủ công (nếu script tự động thất bại)
 
 ### Cài đặt dependencies
@@ -197,6 +218,16 @@ Repository GitHub:
 
 ```bash
 https://github.com/Ngotuan222/led-announcer.git
+```
+
+### 0. Cấu hình thông tin người dùng Git (làm một lần)
+
+```bash
+git config --global user.name "Ngotuan222"
+git config --global user.email "ngohuutuan.vtn@gmail.com"   # Thay bằng email GitHub của bạn
+
+# Kiểm tra lại thông tin đã cấu hình
+git config --list | grep user
 ```
 
 ### 1. Kiểm tra trạng thái hiện tại
