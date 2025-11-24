@@ -32,6 +32,7 @@ class LedDisplay:
     _matrix: Optional[RGBMatrix] = None
     _lock: threading.Lock = threading.Lock()
     _previous_text: str = ""  # Lưu text cũ cho dòng trên
+    _current_animation_id: int = 0  # Nhận diện animation hiện tại của show_scrolling_text
 
     def __post_init__(self) -> None:
         if RGBMatrix is None:
@@ -98,13 +99,46 @@ class LedDisplay:
         text = text.replace('đ', 'd').replace('Đ', 'D')
         return text
 
+    def _wrap_text_to_lines(self, text: str, max_width: int) -> list[str]:
+        if self._matrix is None:
+            raise LedDisplayUnavailable("LED matrix not initialized")
+
+        words = text.split()
+        if not words:
+            return [""]
+
+        lines: list[str] = []
+        current_line = ""
+        temp_canvas = self._matrix.CreateFrameCanvas()
+
+        for word in words:
+            tentative = (current_line + " " + word).strip()
+            width = graphics.DrawText(
+                temp_canvas,
+                self._font,
+                0,
+                self._font.height,
+                self._text_color,
+                tentative,
+            )
+
+            if width <= max_width or not current_line:
+                current_line = tentative
+            else:
+                lines.append(current_line)
+                current_line = word
+
+        if current_line:
+            lines.append(current_line)
+
+        return lines
+
     def show_text(self, text: str) -> None:
         if self._matrix is None:
             raise LedDisplayUnavailable("LED matrix not initialized")
 
         with self._lock:
             # Chuyển đổi text tiếng Việt có dấu sang không dấu
-            # Vì các font BDF mặc định không hỗ trợ Unicode/dấu
             display_text = self._remove_vietnamese_diacritics(text)
             
             LOGGER.debug("Rendering text on LED display: '%s' -> '%s'", text, display_text)
@@ -124,7 +158,9 @@ class LedDisplay:
             # total_rows = 32, font_height = 10
             # baseline = 16 + 5 = 21 (text sẽ nằm từ y=11 đến y=21, giữa là y=16)
             # Dời toàn bộ text lên trên 3 pixel
-            baseline = total_rows // 2 + font_height // 2 - 2
+            # Dịch thêm 1 pixel nữa để toàn bộ nội dung nằm cao hơn
+            baseline = total_rows // 2 + font_height // 2 - 3
+            
             
             # Tính chiều dài text để căn giữa (dựa trên tổng chiều ngang)
             # Sử dụng canvas tạm để đo chiều dài text
@@ -171,152 +207,174 @@ class LedDisplay:
 
     def show_scrolling_text(self, text: str, scroll_speed: float = 0.1) -> None:
         """
-        Hiển thị text chạy ngang từ phải sang trái trên 2 hàng:
-        - Dòng trên: text cũ (scrolling)
-        - Dòng dưới: text mới (scrolling)
+        Hiển thị text chạy dọc từ dưới lên, căn giữa theo chiều ngang.
+
+        - Nếu text (sau khi wrap) thấp hơn hoặc bằng chiều cao màn hình:
+          cuộn một lần đến vị trí giữa rồi dừng và giữ frame.
+        - Nếu text cao hơn màn hình:
+          cuộn từ dưới lên, hết một vòng thì lặp lại cho đến khi có API mới.
         """
         if self._matrix is None:
             raise LedDisplayUnavailable("LED matrix not initialized")
 
-        with self._lock:
-            # Chuyển đổi text tiếng Việt có dấu sang không dấu
-            display_text = self._remove_vietnamese_diacritics(text)
-            previous_display_text = self._remove_vietnamese_diacritics(self._previous_text)
-            
-            LOGGER.debug("Rendering 2-line scrolling text: previous='%s' -> '%s', new='%s' -> '%s'", 
-                        self._previous_text, previous_display_text, text, display_text)
-            canvas = self._matrix.CreateFrameCanvas()
+        # Mỗi lần gọi gán một animation_id mới, để vòng cuộn cũ biết khi nào cần dừng
+        self._current_animation_id += 1
+        animation_id = self._current_animation_id
 
-            # Tính kích thước màn hình thực tế
-            total_rows = self.config.rows * self.config.parallel
-            total_cols = self.config.cols * self.config.chain_length
-            
-            # Tính vị trí cho 2 dòng, đối xứng quanh tâm màn hình
-            font_height = self._font.height
+        # Chuyển đổi text tiếng Việt có dấu sang không dấu
+        display_text = self._remove_vietnamese_diacritics(text)
 
-            # Tâm màn hình theo chiều dọc
-            center_row = total_rows // 2
-            # Giữ khoảng cách tối thiểu giữa 2 dòng để chữ không chồng lên nhau
-            line_spacing = max(2, font_height // 4)
+        LOGGER.debug(
+            "Rendering vertical scrolling text (full): '%s' -> '%s' (animation_id=%d)",
+            text,
+            display_text,
+            animation_id,
+        )
 
-            # Khoảng cách giữa tâm 2 dòng
-            line_center_offset = (font_height + line_spacing) // 2
+        # Chuẩn bị canvas riêng cho animation này
+        canvas = self._matrix.CreateFrameCanvas()
 
-            # Chuyển từ tâm sang baseline (baseline = center + font_height/2)
-            top_center = center_row - line_center_offset
-            bottom_center = center_row + line_center_offset
-            # Dời cả hai baseline lên trên 3 pixel
-            top_baseline = max(font_height, top_center + font_height // 2 - 2)
-            bottom_baseline = min(total_rows - 1, bottom_center + font_height // 2 - 3)
-            
-            # Tính chiều dài text mới và text cũ
-            temp_canvas = self._matrix.CreateFrameCanvas()
-            new_text_length = graphics.DrawText(
+        # Tính kích thước màn hình thực tế
+        total_rows = self.config.rows * self.config.parallel
+        total_cols = self.config.cols * self.config.chain_length
+
+        # Chiều cao font và khoảng cách giữa các dòng
+        font_height = self._font.height
+        line_spacing = max(2, font_height // 4)
+
+        # Wrap toàn bộ text thành nhiều dòng (không giới hạn) theo chiều rộng màn hình
+        lines = self._wrap_text_to_lines(display_text, total_cols)
+        num_lines = len(lines)
+
+        # Tính tổng chiều cao khối text
+        text_block_height = num_lines * font_height + max(0, num_lines - 1) * line_spacing
+
+        # Tâm màn hình theo chiều dọc (dịch toàn bộ nội dung lên trên 1 pixel)
+        center_row = total_rows // 2 - 1
+
+        # Căn khối text quanh tâm màn hình theo chiều dọc
+        top_center = center_row - text_block_height // 2
+
+        # Chuẩn bị baseline và vị trí X cho từng dòng
+        baselines: list[int] = []
+        start_x_list: list[int] = []
+
+        temp_canvas = self._matrix.CreateFrameCanvas()
+        for i, line in enumerate(lines):
+            line_top = top_center + i * (font_height + line_spacing)
+            baseline = line_top + font_height
+            baselines.append(baseline)
+
+            length = graphics.DrawText(
                 temp_canvas,
                 self._font,
                 0,
-                bottom_baseline,
+                baseline,
                 self._text_color,
-                display_text,
+                line,
             )
-            
-            # Tính chiều dài text cũ
-            prev_text_length = 0
-            if previous_display_text:
-                prev_text_length = graphics.DrawText(
-                    temp_canvas,
-                    self._font,
-                    0,
-                    top_baseline,
-                    self._text_color,
-                    previous_display_text,
-                )
+            start_x = max((total_cols - length) // 2, 0)
+            start_x_list.append(start_x)
 
-            # Xác định text dài nhất để làm thời gian chạy
-            max_length = max(new_text_length, prev_text_length)
-            
-            # Nếu cả 2 text đều ngắn hơn màn hình, hiển thị tĩnh
-            if max_length <= total_cols:
-                canvas.Clear()
-                
-                # Dòng trên: text cũ (căn giữa)
-                if previous_display_text:
-                    prev_start_x = max((total_cols - prev_text_length) // 2, 0)
-                    graphics.DrawText(
-                        canvas,
-                        self._font,
-                        prev_start_x,
-                        top_baseline,
-                        self._text_color,
-                        previous_display_text,
-                    )
-                
-                # Dòng dưới: text mới (căn giữa)
-                new_start_x = (total_cols - new_text_length) // 2
-                graphics.DrawText(
-                    canvas,
-                    self._font,
-                    new_start_x,
-                    bottom_baseline,
-                    self._text_color,
-                    display_text,
-                )
-                
-                self._matrix.SwapOnVSync(canvas)
-                if self.config.hold_seconds > 0:
-                    time.sleep(self.config.hold_seconds)
-            else:
-                # Một trong hai text dài hơn màn hình: chạy cả 2 từ phải sang trái
-                # Bắt đầu từ bên phải màn hình
-                start_x = total_cols
-                # Kết thúc khi text dài nhất chạy qua bên trái màn hình
-                end_x = -max_length
-                
-                for x in range(start_x, end_x, -1):
+        # Tính toán phạm vi cuộn:
+        # - Nếu toàn bộ text nằm vừa màn hình, chỉ cuộn đến đúng tâm rồi dừng.
+        # - Nếu text cao hơn màn hình, lặp lại hiệu ứng cuộn từ dưới lên vô hạn
+        #   (cho tới khi có API mới gọi hàm này với text khác).
+        fits_on_screen = text_block_height <= total_rows
+
+        if fits_on_screen:
+            # Trường hợp text thấp, chỉ cần cuộn một lần rồi dừng ở giữa
+            start_offset = total_rows
+            end_offset = 0
+
+            for offset in range(start_offset, end_offset - 1, -1):
+                # Nếu đã có animation mới, dừng ngay
+                if animation_id != self._current_animation_id:
+                    LOGGER.debug("Animation %d cancelled before finishing short scroll", animation_id)
+                    return
+
+                with self._lock:
                     canvas.Clear()
-                    
-                    # Dòng trên: text cũ (scrolling)
-                    if previous_display_text:
-                        # Nếu text cũ ngắn, căn giữa khi chạy
-                        if prev_text_length <= total_cols:
-                            # Text ngắn: căn giữa trong khi chạy theo text dài
-                            prev_x = x + (max_length - prev_text_length) // 2
-                        else:
-                            # Text dài: chạy bình thường
-                            prev_x = x
-                        
+                    for i, line in enumerate(lines):
+                        y = baselines[i] + offset
+                        # Chỉ vẽ nếu phần baseline còn nằm trong vùng hiển thị mở rộng
+                        if y < -font_height or y > total_rows + font_height:
+                            continue
                         graphics.DrawText(
                             canvas,
                             self._font,
-                            prev_x,
-                            top_baseline,
+                            start_x_list[i],
+                            y,
                             self._text_color,
-                            previous_display_text,
+                            line,
                         )
-                    
-                    # Dòng dưới: text mới (scrolling)
-                    # Nếu text mới ngắn, căn giữa khi chạy
-                    if new_text_length <= total_cols:
-                        # Text ngắn: căn giữa trong khi chạy theo text dài
-                        new_x = x + (max_length - new_text_length) // 2
-                    else:
-                        # Text dài: chạy bình thường
-                        new_x = x
-                    
-                    graphics.DrawText(
-                        canvas,
-                        self._font,
-                        new_x,
-                        bottom_baseline,
-                        self._text_color,
-                        display_text,
-                    )
-                    
                     self._matrix.SwapOnVSync(canvas)
-                    time.sleep(scroll_speed)
+                time.sleep(scroll_speed)
 
-            # Lưu text hiện tại làm text cũ cho lần tiếp theo
+            # Với text ngắn (nằm gọn trong màn hình), giữ nguyên frame ở giữa theo cấu hình
+            hold_seconds = getattr(self.config, "short_text_hold_seconds", 10.0)
+            if animation_id == self._current_animation_id and hold_seconds > 0:
+                LOGGER.debug(
+                    "Holding centered scrolling frame for %.2f seconds (animation_id=%d)",
+                    hold_seconds,
+                    animation_id,
+                )
+                # Chia nhỏ thời gian chờ để nếu có animation mới thì dừng ngay
+                step = 0.1
+                steps = int(hold_seconds / step)
+                for _ in range(steps):
+                    if animation_id != self._current_animation_id:
+                        LOGGER.debug("Animation %d cancelled during hold", animation_id)
+                        return
+                    time.sleep(step)
+
+            # Sau khi giữ xong, nếu vẫn là animation hiện tại thì clear màn hình và cập nhật text cũ
+            if animation_id == self._current_animation_id:
+                with self._lock:
+                    clear_canvas = self._matrix.CreateFrameCanvas()
+                    clear_canvas.Clear()
+                    self._matrix.SwapOnVSync(clear_canvas)
+                self._previous_text = text
+            return
+
+        # Trường hợp text cao hơn màn hình: cuộn từ dưới lên ~3 lần rồi kết thúc
+        max_loops = 3
+        for loop_idx in range(max_loops):
+            # Nếu có animation mới, dừng ngay
+            if animation_id != self._current_animation_id:
+                LOGGER.debug("Animation %d cancelled before long scroll loop %d", animation_id, loop_idx)
+                return
+
+            start_offset = total_rows + text_block_height
+            end_offset = -text_block_height
+
+            for offset in range(start_offset, end_offset - 1, -1):
+                if animation_id != self._current_animation_id:
+                    LOGGER.debug("Animation %d cancelled mid long scroll (loop %d)", animation_id, loop_idx)
+                    return
+
+                with self._lock:
+                    canvas.Clear()
+                    for i, line in enumerate(lines):
+                        y = baselines[i] + offset
+                        # Chỉ vẽ nếu phần baseline còn nằm trong vùng hiển thị mở rộng
+                        if y < -font_height or y > total_rows + font_height:
+                            continue
+                        graphics.DrawText(
+                            canvas,
+                            self._font,
+                            start_x_list[i],
+                            y,
+                            self._text_color,
+                            line,
+                        )
+                    self._matrix.SwapOnVSync(canvas)
+                time.sleep(scroll_speed)
+
+        # Sau khi cuộn đủ số lần, nếu chưa bị animation khác ghi đè thì cập nhật text cũ
+        if animation_id == self._current_animation_id:
             self._previous_text = text
+        # Không giữ frame cuối để tránh delay cho lần API tiếp theo
 
     def clear(self) -> None:
         if self._matrix is None:

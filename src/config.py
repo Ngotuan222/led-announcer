@@ -27,6 +27,7 @@ class LedDisplayConfig:
     background_color: List[int] = field(default_factory=lambda: [0, 0, 0])
     text_color: List[int] = field(default_factory=lambda: [255, 255, 255])
     hold_seconds: float = 8.0
+    short_text_hold_seconds: float = 10.0  # Thời gian giữ text ngắn sau khi dừng ở giữa (giây)
     scan_mode: int = 0
     multiplexing: int = 0
 
