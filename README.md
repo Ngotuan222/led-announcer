@@ -276,7 +276,7 @@ https://github.com/Ngotuan222/led-announcer
 
 để kiểm tra lại code đã được cập nhật.
 
-## 📝 Ghi chú cấu hình panel 64x32 ICN2012
+## 🧾 Ghi chú cấu hình panel 64x32 ICN2012
 
 - **Phần cứng**
   - Panel P5 64x32, driver ICN2012.
@@ -301,3 +301,94 @@ https://github.com/Ngotuan222/led-announcer
   - `testled/testled.py` (ngoài project `led-announcer`):
     - Cấu hình cố định 64x32, `multiplexing = 1`.
     - Vẽ một điểm tâm màn hình và chữ "test" căn giữa để kiểm tra nhanh mapping phần cứng.
+
+## 🧪 Ghi chú sự cố & khắc phục GPIO 5 (door control)
+
+### Triệu chứng
+
+- API `/announce` trả về:
+  - `{ "status": "ok", "door_status": "open-door" }` hoặc `"close-door"`.
+- Nhưng khi đo chân **GPIO5 (BCM 5, chân vật lý 29)** trên Raspberry Pi 4B:
+  - Không thấy điện áp thay đổi khi gọi `open-door` / `close-door`.
+
+### Nguyên nhân gốc
+
+1. **RPi.GPIO chưa được cài trong virtualenv** mà service systemd sử dụng:
+   - Service `led-announcer` chạy với:
+     - `WorkingDirectory=/home/loaled/Desktop/loaled/led-announcer`
+     - `PATH=/home/loaled/Desktop/loaled/led-announcer/.venv/bin:...`
+     - `ExecStart=/home/loaled/Desktop/loaled/led-announcer/.venv/bin/uvicorn src.main:app ...`
+   - Trong log `journalctl -u led-announcer` có dòng cảnh báo:
+     - `RPi.GPIO not available. Door control GPIO26 will be disabled.`
+   - Khi đó, hàm `_handle_door_status()` trong `src/main.py` chỉ log cảnh báo và **không gọi** `GPIO.output(...)`, nhưng API vẫn trả `door_status`.
+
+2. Ban đầu door control dùng **BCM 26** nên có nguy cơ trùng với mapping HUB75 của `rpi-rgb-led-matrix`. Sau đó đã đổi sang **BCM 5** để hoàn toàn tách biệt với chân LED.
+
+### Cách khắc phục
+
+1. **Cài RPi.GPIO trong đúng virtualenv** mà service dùng:
+
+   ```bash
+   cd /home/loaled/Desktop/loaled/led-announcer
+   source .venv/bin/activate
+   pip install RPi.GPIO
+   deactivate
+   ```
+
+2. **Khởi động lại service** để dùng môi trường mới:
+
+   ```bash
+   sudo systemctl restart led-announcer
+   sudo journalctl -u led-announcer -n 20
+   ```
+
+   - Đảm bảo log **không còn** dòng `RPi.GPIO not available...`.
+
+3. **Xác nhận door control dùng đúng chân GPIO5 (pin 29)**:
+
+   - Trong `src/main.py`:
+
+     ```python
+     GPIO.setmode(GPIO.BCM)
+     DOOR_GPIO_PIN = 5  # GPIO5 (BCM), chân vật lý 29
+     ```
+
+   - Trong `KET_NOI_HARDWARE.md` có bảng `BCM ↔ chân vật lý`, trong đó:
+     - `5 | 29 | GPIO5 – dùng cho điều khiển cửa (door control) trong code`.
+
+4. **Test trực tiếp GPIO5 bằng script Python đơn giản** (để loại trừ vấn đề phần cứng/đấu dây):
+
+   ```bash
+   python3 - << 'EOF'
+   import RPi.GPIO as GPIO
+   import time
+
+   PIN = 5  # BCM5, chân vật lý 29
+   GPIO.setmode(GPIO.BCM)
+   GPIO.setup(PIN, GPIO.OUT, initial=GPIO.LOW)
+
+   print("LOW  (0V)..."); time.sleep(3)
+   GPIO.output(PIN, GPIO.HIGH)
+   print("HIGH (~3.3V)..."); time.sleep(10)
+   GPIO.output(PIN, GPIO.LOW)
+   print("LOW again"); time.sleep(3)
+
+   GPIO.cleanup(PIN)
+   EOF
+   ```
+
+5. **Test lại qua API**:
+
+   ```bash
+   curl -X POST http://localhost:8000/announce \
+     -u admin:hkqt@2024 \
+     -H "Content-Type: application/json" \
+     -d '{"status": "open-door"}'
+
+   curl -X POST http://localhost:8000/announce \
+     -u admin:hkqt@2024 \
+     -H "Content-Type: application/json" \
+     -d '{"status": "close-door"}'
+   ```
+
+   - Khi service chạy đúng, điện áp trên chân **pin 29** sẽ lần lượt **lên HIGH (~3.3V)** rồi về **LOW (0V)**.

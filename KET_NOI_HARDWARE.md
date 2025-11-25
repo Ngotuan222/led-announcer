@@ -57,26 +57,55 @@ Hàng dưới:  G1 GND  G2   E   B   D  LAT GND
 
 > **Lưu ý:** Sơ đồ này dựa trên [tài liệu chính thức](https://github.com/hzeller/rpi-rgb-led-matrix/blob/master/wiring.md) của thư viện rpi-rgb-led-matrix với `hardware_mapping: regular`. Nếu module LED của bạn có sơ đồ chân khác (in trên PCB), bạn có thể cần tạo custom hardware mapping.
 
-| Chân IDC | Tín hiệu | GPIO Raspberry Pi | Chân vật lý | Mô tả |
-|----------|----------|-------------------|-------------|-------|
-| 1        | R1 (Red 1) | GPIO 13 | Pin 23 | Màu đỏ - nửa trên |
-| 2        | G1 (Green 1) | GPIO 19 | Pin 13 | Màu xanh lá - nửa trên |
-| 3        | B1 (Blue 1) | GPIO 26 | Pin 26 | Màu xanh dương - nửa trên |
-| 4        | **GND** | GND | Pin 6, 9, 14, 20, 25, 30, 34, 39 | Nối đất |
-| 5        | R2 (Red 2) | GPIO 12 | Pin 24 | Màu đỏ - nửa dưới |
-| 6        | G2 (Green 2) | GPIO 20 | Pin 21 | Màu xanh lá - nửa dưới |
-| 7        | B2 (Blue 2) | GPIO 21 | Pin 19 | Màu xanh dương - nửa dưới |
-| 8        | **E (Address E)** | GPIO 10 | Pin 10 | Địa chỉ hàng bit 4 (cho 64+ hàng) |
-| 9        | A (Address A) | GPIO 15 | Pin 15 | Địa chỉ hàng bit 0 |
-| 10       | B (Address B) | GPIO 18 | Pin 16 | Địa chỉ hàng bit 1 |
-| 11       | C (Address C) | GPIO 23 | Pin 18 | Địa chỉ hàng bit 2 |
-| 12       | D (Address D) | GPIO 25 | Pin 22 | Địa chỉ hàng bit 3 |
-| 13       | CLK (Clock) | GPIO 11 | Pin 11 | Xung đồng hồ dữ liệu |
-| 14       | LAT (Latch/Strobe) | GPIO 7 | Pin 7 | Chốt dữ liệu |
-| 15       | OE (Output Enable) | GPIO 12 | Pin 12 | Bật/tắt đầu ra |
-| 16       | **GND** | GND | Pin 6, 9, 14, 20, 25, 30, 34, 39 | Nối đất |
+
+
 
 > **✅ Đã kiểm tra:** Sơ đồ này đã được xác minh và cập nhật theo sơ đồ chân thực tế trên PCB module LED (xem KIEM_TRA_SO_DO_CHAN.md).
+
+**Bảng tham chiếu nhanh: BCM ↔ chân vật lý (Raspberry Pi 4B)**
+
+> **Lưu ý:** Project này sử dụng `GPIO.setmode(GPIO.BCM)` trong code, vì vậy **mọi giá trị GPIO trong code đều là số BCM**, *không phải* số chân vật lý hay WiringPi.
+
+| BCM | Chân vật lý | Ghi chú ngắn |
+|-----|-------------|--------------|
+| 2   | 3           | SDA1 (I2C) |
+| 3   | 5           | SCL1 (I2C) |
+| 4   | 7           | GPIO4 |
+| 5   | 29          | **GPIO5 – dùng cho điều khiển cửa (door control) trong code** |
+| 6   | 31          | GPIO6 |
+| 7   | 26          | GPIO7 / SPI0 CE1 |
+| 8   | 24          | SPI0 CE0 |
+| 9   | 21          | SPI0 MISO |
+| 10  | 19          | SPI0 MOSI |
+| 11  | 23          | SPI0 SCLK |
+| 12  | 32          | GPIO12 / PWM0 |
+| 13  | 33          | GPIO13 / PWM1 |
+| 14  | 8           | UART0 TXD |
+| 15  | 10          | UART0 RXD |
+| 16  | 36          | GPIO16 |
+| 17  | 11          | GPIO17 |
+| 18  | 12          | GPIO18 / PWM0 |
+| 19  | 35          | GPIO19 / PCM_FS |
+| 20  | 38          | GPIO20 / PCM_DOUT |
+| 21  | 40          | GPIO21 / PCM_CLK |
+| 22  | 15          | GPIO22 |
+| 23  | 16          | GPIO23 |
+| 24  | 18          | GPIO24 |
+| 25  | 22          | GPIO25 |
+| 26  | 37          | GPIO26 / PCM_DIN |
+| 27  | 13          | GPIO27 |
+
+Các chân nguồn và GND hay dùng:
+
+- 3.3V: chân 1, 17
+- 5V: chân 2, 4
+- GND: chân 6, 9, 14, 20, 25, 30, 34, 39
+
+**Quan trọng cho điều khiển cửa (door control):**
+
+- Trong `src/main.py`, chân điều khiển cửa được cấu hình là `DOOR_GPIO_PIN = 5` với `GPIO.setmode(GPIO.BCM)`.
+- Nghĩa là **dây điều khiển cửa phải được cắm vào chân vật lý số 29** trên header 40-pin của Raspberry Pi 4B.
+- Nếu bạn muốn dùng chân vật lý khác, hãy tra bảng trên để đổi sang số BCM tương ứng trong code.
 
 **Lưu ý quan trọng:**
 - Sơ đồ này sử dụng **hardware mapping "regular"** (mặc định) của thư viện rpi-rgb-led-matrix
