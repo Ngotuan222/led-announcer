@@ -1,14 +1,15 @@
 [Unit]
 Description=LED Announcer HTTP Service
 After=network.target sound.target
+Wants=sound.target
 
 [Service]
 Type=simple
-User=admin
-WorkingDirectory=/home/admin/led-announcer
-Environment="PATH=/home/admin/led-announcer/.venv/bin:/usr/local/bin:/usr/bin"
-ExecStartPre=/home/admin/led-announcer/scripts/fix_audio.sh
-ExecStart=/home/admin/led-announcer/.venv/bin/uvicorn src.main:app --host 0.0.0.0 --port 8000
+User=loaled
+WorkingDirectory=/home/loaled/Desktop/loaled/led-announcer
+Environment="PATH=/home/loaled/Desktop/loaled/led-announcer/.venv/bin:/usr/local/bin:/usr/bin"
+ExecStartPre=/bin/sleep 5
+ExecStart=/home/loaled/Desktop/loaled/led-announcer/.venv/bin/uvicorn src.main:app --host 0.0.0.0 --port 8000
 Restart=on-failure
 RestartSec=5
 

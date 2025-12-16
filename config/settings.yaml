@@ -19,8 +19,8 @@ led:
 audio:
   language: vi
   slow: false
-  playback_command: ["/usr/bin/ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet"] # playback_command: ["/usr/bin/mpg123", "-a", "hw:0,0"]
-  cache_dir: null
+  playback_command: ["/usr/bin/ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", "-af", "atempo=1.5"] # playback_command: ["/usr/bin/mpg123", "-a", "hw:0,0"]
+  cache_dir: "/home/loaled/tts_cache"
 
 service:
   host: 0.0.0.0

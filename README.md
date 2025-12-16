@@ -69,8 +69,9 @@ curl http://localhost:8000/healthz
 
 # Test announce
 curl -X POST http://localhost:8000/announce \
+  -u admin:hkqt@2024 \
   -H "Content-Type: application/json" \
-  -d '{"id":"001","fullname":"Nguyễn Văn A"}'
+  -d '{"id":"001","fullname":"Kiểm tra dịch vụ giọng nói google đã hoạt động lưu xuống cache"}'
 ```
 
 ### Từ thiết bị khác
@@ -392,3 +393,21 @@ https://github.com/Ngotuan222/led-announcer
    ```
 
    - Khi service chạy đúng, điện áp trên chân **pin 29** sẽ lần lượt **lên HIGH (~3.3V)** rồi về **LOW (0V)**.
+
+## 🧾 Ghi chú cấu hình cache tts, tăng tốc độ đọc:
+1. Bật cache:
+- Mở config/settings.yaml.
+Đặt:
+```yaml
+    audio:
+       ...
+      cache_dir: "/home/loaled/tts_cache"
+```
+- Tắt cache:
+Đặt cache_dir: null hoặc xoá dòng cache_dir.
+- Kiểm tra cache đang bật:
+Xem settings.yaml → cache_dir khác null.
+Hoặc xem log: Using TTS cache directory: ....
+Hoặc kiểm tra thư mục cache có file .mp3.
+- Tăng tốc độ đọc ~1.5x:
+Thêm "-af", "atempo=1.5" vào playback_command trong settings.yaml.
