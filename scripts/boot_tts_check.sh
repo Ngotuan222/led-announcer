@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Wait a bit to ensure service is ready
-sleep 10
+sleep 5
 curl -X POST http://localhost:8000/announce \
   -u admin:hkqt@2024 \
   -H "Content-Type: application/json" \

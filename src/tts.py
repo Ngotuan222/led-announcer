@@ -61,11 +61,20 @@ class TextToSpeech:
 
     def _play(self, path: Path) -> None:
         command = list(self._config.playback_command)
-        command.append(str(path))
+
+        # Hỗ trợ placeholder đặc biệt "__FILE__" trong playback_command để
+        # chỉ định chính xác vị trí chèn đường dẫn file âm thanh.
+        # Ví dụ trong settings.yaml:
+        #   playback_command: ["/usr/bin/play", "-q", "__FILE__", "tempo", "1.5"]
+        # sẽ trở thành:
+        #   /usr/bin/play -q /path/to/file.mp3 tempo 1.5
+        if "__FILE__" in command:
+            command = [str(path) if arg == "__FILE__" else arg for arg in command]
+        else:
+            command.append(str(path))
+
         LOGGER.info("Playing audio with command: %s", " ".join(command))
         try:
             subprocess.run(command, check=True)
         except (subprocess.CalledProcessError, FileNotFoundError) as exc:
             raise TextToSpeechError(f"Failed to play audio: {exc}") from exc
-
-
