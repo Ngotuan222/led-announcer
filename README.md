@@ -1,6 +1,6 @@
 # LED Announcer Service
 
-Dịch vụ Python dành cho Raspberry Pi 4 nhằm nhận yêu cầu qua HTTP (ví dụ Postman), hiển thị họ tên trên màn hình LED P4 256x128 (module 2121 A2) và phát giọng nói tiếng Việt bằng Google Text-to-Speech.
+Dịch vụ Python dành cho Raspberry Pi 4 nhằm nhận yêu cầu qua HTTP (ví dụ Postman), hiển thị họ tên trên màn hình LED P4 256x128 (module 2121 A2) và phát giọng nói tiếng Việt bằng Google Text-to-Speech hoặc Sentrux TTS.
 
 ## 📥 Cài đặt từ GitHub
 
@@ -91,8 +91,31 @@ Content-Type: application/json
 Thay đổi thông số trong `config/settings.yaml`:
 
 - `led`: kích thước panel, độ sáng, tốc độ PWM, đường dẫn font
-- `audio`: ngôn ngữ TTS (mặc định `vi`), lệnh phát (`mpg123 -q`)
+- `audio`:
+  - `provider`: Chọn nhà cung cấp TTS (`gtts` hoặc `sentrux`).
+  - `language`: Ngôn ngữ TTS (mặc định `vi`).
+  - `voice`: Giọng đọc (chỉ dùng cho `sentrux`, mặc định `Dung (nữ miền Nam)`).
+  - `playback_command`: Lệnh phát (`mpg123 -q`).
+  - `cache_dir`: Đường dẫn thư mục cache (ví dụ `/home/loaled/tts_cache`).
 - `service`: địa chỉ và cổng chạy FastAPI
+
+### Ví dụ cấu hình Audio
+
+**Sử dụng Google TTS (gTTS):**
+```yaml
+audio:
+  provider: "gtts"
+  language: "vi"
+  cache_dir: "/home/loaled/tts_cache"
+```
+
+**Sử dụng Sentrux TTS:**
+```yaml
+audio:
+  provider: "sentrux"
+  voice: "Dung (nữ miền Nam)"
+  cache_dir: "/home/loaled/tts_cache"
+```
 
 ### 📢 Tăng max volume trên Raspberry Pi 4B
 

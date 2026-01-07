@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import logging
 import subprocess
 import tempfile
 import threading
 from pathlib import Path
+from typing import Optional
 
-from gtts import gTTS
+import requests
 
 from .config import AudioConfig
 
@@ -19,10 +21,16 @@ class TextToSpeechError(RuntimeError):
 
 
 class TextToSpeech:
+    API_URL = "https://tts.bio-eco.vn/api/tts"
+    VOICES_URL = "https://tts.bio-eco.vn/api/voices"
+    AUTH_HEADER = {"Authorization": "Basic c2VudHJ1eDpoa3F0dkAyMDI0"}
+
     def __init__(self, config: AudioConfig) -> None:
         self._config = config
         self._lock = threading.Lock()
         self._ensure_cache()
+        # Default voice if not specified or invalid
+        self._voice = "Dung (nữ miền Nam)"
 
     def _ensure_cache(self) -> None:
         if self._config.cache_dir:
@@ -40,25 +48,29 @@ class TextToSpeech:
             LOGGER.warning("Empty text received for TTS. Skipping playback.")
             return
 
-        # Sử dụng lock để đảm bảo tuần tự hóa việc phát âm thanh,
-        # tránh trường hợp 2 luồng cùng gọi speak gây chồng lấn âm thanh.
         with self._lock:
-            LOGGER.info("Generating TTS for: %s", text)
+            LOGGER.info("Generating TTS (Sentrux) for: %s", text)
             audio_file = None
             try:
                 audio_file = self._synthesize(text)
                 self._play(audio_file)
             except Exception as exc:
                 LOGGER.error("Error during TTS processing: %s", exc)
-                # Re-raise để caller biết có lỗi
                 raise
             finally:
                 if audio_file and not self._config.cache_dir:
                     audio_file.unlink(missing_ok=True)
 
     def _synthesize(self, text: str) -> Path:
+        # Determine voice from config language if possible, otherwise use default
+        # Mapping simple language codes to Sentrux voices could be added here
+        # For now, we use the default voice or one specified in config if we extend AudioConfig
+        voice = self._voice
+        
+        # Create a unique hash for the text AND the voice, so changing voice re-generates audio
+        text_hash = hashlib.sha256(f"{text}|{voice}".encode("utf-8")).hexdigest()
+
         if self._config.cache_dir:
-            text_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
             cache_path = Path(self._config.cache_dir).expanduser() / f"{text_hash}.mp3"
             if cache_path.exists():
                 LOGGER.debug("Using cached speech for '%s' (hash: %s)", text, text_hash)
@@ -66,8 +78,33 @@ class TextToSpeech:
         else:
             cache_path = Path(tempfile.NamedTemporaryFile(delete=False, suffix=".mp3").name)
 
-        tts = gTTS(text=text, lang=self._config.language, slow=self._config.slow)
-        tts.save(str(cache_path))
+        try:
+            payload = {
+                "text": text,
+                "voice": voice
+            }
+            headers = {
+                "Content-Type": "application/json",
+                **self.AUTH_HEADER
+            }
+            
+            LOGGER.debug("Requesting TTS from Sentrux API...")
+            response = requests.post(self.API_URL, json=payload, headers=headers, timeout=10)
+            response.raise_for_status()
+            
+            data = response.json()
+            if "data" not in data:
+                raise TextToSpeechError("Invalid response from Sentrux API: 'data' field missing")
+            
+            audio_content = base64.b64decode(data["data"])
+            
+            with open(cache_path, "wb") as f:
+                f.write(audio_content)
+                
+        except requests.RequestException as exc:
+            raise TextToSpeechError(f"Sentrux API request failed: {exc}") from exc
+        except (ValueError, KeyError) as exc:
+            raise TextToSpeechError(f"Failed to parse Sentrux API response: {exc}") from exc
 
         if not cache_path.exists() or cache_path.stat().st_size == 0:
             raise TextToSpeechError("TTS file generation failed: File is empty or missing")
@@ -89,8 +126,6 @@ class TextToSpeech:
 
         LOGGER.info("Playing audio with command: %s", " ".join(command))
         try:
-            # subprocess.run mặc định sẽ chờ (block) cho đến khi lệnh thực thi xong.
-            # Điều này giúp đảm bảo âm thanh phát xong mới trả về.
             subprocess.run(command, check=True, capture_output=True, text=True)
         except subprocess.CalledProcessError as exc:
             LOGGER.error("Playback failed with stderr: %s", exc.stderr)

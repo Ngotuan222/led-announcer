@@ -34,7 +34,9 @@ class LedDisplayConfig:
 
 @dataclass
 class AudioConfig:
+    provider: str = "gtts"  # "gtts" or "sentrux"
     language: str = "vi"
+    voice: str = "Dung (nữ miền Nam)"  # Only used for sentrux Ngọc (nữ miền Bắc)
     slow: bool = False
     playback_command: List[str] = field(default_factory=lambda: ["mpg123", "-q"])
     cache_dir: str | None = None
@@ -83,5 +85,3 @@ def _get_section(data: Dict[str, Any], section: str) -> Dict[str, Any]:
         LOGGER.warning("Configuration section '%s' is not a mapping. Ignoring.", section)
         return {}
     return value
-
-

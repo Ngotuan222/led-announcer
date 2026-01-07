@@ -5,11 +5,12 @@ import queue
 import threading
 import time
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 
 from .config import AppConfig
 from .display import LedDisplay, LedDisplayUnavailable
-from .tts import TextToSpeech, TextToSpeechError
+from .tts import TextToSpeech as GttsTextToSpeech, TextToSpeechError as GttsTextToSpeechError
+from .tts_sentrux import TextToSpeech as SentruxTextToSpeech, TextToSpeechError as SentruxTextToSpeechError
 
 
 LOGGER = logging.getLogger(__name__)
@@ -29,7 +30,7 @@ class AnnouncementProcessor:
         self._thread: Optional[threading.Thread] = None
 
         self._display = self._initialize_display()
-        self._tts = TextToSpeech(config.audio)
+        self._tts = self._initialize_tts()
 
     def _initialize_display(self) -> Optional[LedDisplay]:
         try:
@@ -38,6 +39,14 @@ class AnnouncementProcessor:
             LOGGER.error("LED display unavailable: %s", exc)
             LOGGER.warning("Continuing without LED output. Only audio will play.")
             return None
+
+    def _initialize_tts(self) -> Union[GttsTextToSpeech, SentruxTextToSpeech]:
+        if self._config.audio.provider == "sentrux":
+            LOGGER.info("Using Sentrux TTS provider")
+            return SentruxTextToSpeech(self._config.audio)
+        else:
+            LOGGER.info("Using Google TTS (gTTS) provider")
+            return GttsTextToSpeech(self._config.audio)
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -91,7 +100,7 @@ class AnnouncementProcessor:
         # TTS chạy chính và đợi xong
         try:
             self._tts.speak(announcement.fullname)
-        except TextToSpeechError as exc:
+        except (GttsTextToSpeechError, SentruxTextToSpeechError) as exc:
             LOGGER.exception("Failed to play TTS audio: %s", exc)
 
         # Không đợi LED thread hoàn thành - LED tiếp tục chạy ở nền
